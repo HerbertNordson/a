@@ -1,0 +1,59 @@
+import { NextRequest, NextResponse } from "next/server";
+import dbConnection from "../../database";
+import { fileTypeFromBuffer } from "file-type";
+
+const NO_IMAGE_BS64 = `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
+`;
+
+export async function GET(request: NextRequest) {
+  const id = request.nextUrl.searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json(
+      {
+        error: "ID não encontrado",
+      },
+      { status: 404 }
+    );
+  }
+  const query = `SELECT * FROM cm.VW_AGUATIVA_BARES_CARDAPIO_DIGITAL_PRODUTOS WHERE codArtigo = '${id}'`;
+
+  try {
+    const database = await dbConnection();
+
+    const result = await database.query(query);
+
+    // const result = await database.query(query);
+
+    const data = result.recordset[0];
+
+    if (!data["Imagem"]) {
+      return new NextResponse(Buffer.from(NO_IMAGE_BS64, "base64"), {
+        headers: {
+          "Content-Type": "image/png",
+          "Content-Disposition": `filename=anexo-${id}.png`,
+          "Content-Length": Buffer.from(NO_IMAGE_BS64, "base64").length,
+        } as any,
+      });
+    }
+
+    const type = await fileTypeFromBuffer(data["Imagem"]);
+
+    const buffer = Buffer.from(data["Imagem"]);
+
+    return new NextResponse(buffer, {
+      headers: {
+        "Content-Type": type?.mime ?? "application/octet-stream",
+        "Content-Disposition": `filename=anexo-${id}.${type?.ext ?? "png"}`,
+        "Content-Length": buffer.length,
+      } as any,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error: "Imagem não encontrada",
+      },
+      { status: 404 }
+    );
+  }
+}
